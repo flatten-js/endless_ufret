@@ -1,0 +1,27 @@
+html, body {
+  padding: 0;
+  margin: 0;
+}
+
+ol {
+  padding: 0;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  padding: 1rem .5rem;
+}
+
+li span {
+  margin-right: .5rem;
+}
+
+li i {
+  margin-left: .25rem;
+  cursor: pointer;
+}
+
+.las {
+  font-size: 1.25rem;
+}

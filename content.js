@@ -1,64 +1,68 @@
-const pause = document.getElementById('pause')
+const song_id = new URLSearchParams(location.search).get('data')
 
-let timeid = null
-function to_active(id) {
-  clearTimeout(timeid)
-  pause.click()
+if (song_id) {
+  const pause = document.getElementById('pause')
 
-  const target = document.getElementById(id)
-  target.scrollIntoView({ block: 'nearest', inline: 'start' })
+  let timer
+  function change_active_tab(id) {
+    clearTimeout(timer)
+    pause.click()
   
-  timeid = setTimeout(target.click, 3000)
-}
+    const target_tab = document.getElementById(id)
+    target_tab.scrollIntoView({ block: 'nearest', inline: 'start' })
+  
+    timer = setTimeout(() => target_tab.click(), 3000)
+  }
 
-chrome.runtime.onMessage.addListener(request => {
-  if (request.active) to_active(request.active)
-})
-
-function compare(a, b) {
-  const regex = /(\d+)$/
-  return a.match(regex)[1] - b.match(regex)[1]
-}
-
-document.body.addEventListener('contextmenu', e => {
-  const tab = e.target.id
-  chrome.storage.local.get('tabs', ({ tabs }) => {
-    const item_tabs = [...new Set([...JSON.parse(tabs || '[]'), tab])].sort(compare)
-    chrome.storage.local.set({ 'tabs': JSON.stringify(item_tabs) })
+  chrome.runtime.onMessage.addListener(req => {
+    if (req.tab_id) change_active_tab(req.tab_id) 
   })
-})
 
-document.body.addEventListener('keydown', e => {
-  switch (e.keyCode) {
-    case 8:
-      const active = document.querySelector('.active')
-      chrome.storage.local.get('tabs', ({ tabs }) => {
-        tabs = JSON.parse(tabs || '[]')
+  async function get_tabs() {
+    return new Promise(resolve => {
+      chrome.storage.local.get(song_id, data => {
+        const tabs = JSON.parse(data[song_id] || '[]')
+        return resolve(tabs)
+      })
+    })
+  }
 
-        const target = tabs.reverse().find(tab => {
-          const regex = /(\d+)$/
-          return parseInt(tab.match(regex)[1]) <= parseInt(active.id.match(regex)[1])
+  document.body.addEventListener('contextmenu', async e => {
+    const tab = { name: e.target.id, id: e.target.id, index: e.target.dataset.value }
+    
+    let tabs = await get_tabs()
+    tabs = [...new Map([tab, ...tabs].map(t => [t.index, t])).values()].sort((a,b) => a.index - b.index)
+    chrome.storage.local.set({ [song_id]: JSON.stringify(tabs) })
+  })
+
+  const KEY_CODE_1 = 49
+  document.body.addEventListener('keydown', async e => {
+    switch (e.keyCode) {
+      case 8: {
+        const active_tab = document.querySelector('.active')
+        const tabs = await get_tabs()
+
+        const target_tab = tabs.reverse().find(tab => {
+          return parseInt(tab.index) - parseInt(active_tab.dataset.value)
         })
 
-        if (target) to_active(target)
-      })
-      break
-    
-    case 49:
-    case 50:
-    case 51:
-    case 52:
-    case 53:
-    case 54:
-    case 55:
-    case 56:
-    case 57:
-    case 58:
-      chrome.storage.local.get('tabs', ({ tabs }) => {
-        tabs = JSON.parse(tabs || '[]')
-        target = tabs[e.keyCode - 49]
-        if (target) to_active(target)
-      })
-      break
-  }
-})
+        if (target_tab) change_active_tab(target_tab.id)
+        break 
+      }
+      
+      case KEY_CODE_1:
+      case 50:
+      case 51:
+      case 52:
+      case 53:
+      case 54:
+      case 55:
+      case 56:
+      case 57: {
+        const tabs = await get_tabs()
+        const target_tab = tabs[e.keyCode - KEY_CODE_1]
+        if (target_tab) change_active_tab(target_tab.id)
+      }
+    }
+  })
+}
